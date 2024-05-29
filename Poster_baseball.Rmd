@@ -1,0 +1,119 @@
+---
+title: "Baseball"
+author: ""
+date: ""
+header-includes:
+  - \userpackage{amssymb}
+output: 
+  rmdformats::material
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r include=FALSE}
+library("Lahman")
+library(dplyr)
+library(MASS)
+library(pROC)
+library(caret)
+library(car)
+library(bestglm)
+```
+La intención de este trabajo es el poder predecir cual equipo clasificará a las Play-off en base a distintas estadísticas del baseball.
+# Base de datos
+La siguiente base de datos fue el producto de la unión de la bases Teams y Salaries de la libreria "Lahman" la cual recompila distintas bases de datos que contiene estadísticas de pitcheo, bateo y jardinería de baseball. https://cran.r-project.org/web/packages/Lahman/Lahman.pdf
+A los mismo tiempo se considera del año 1996 en adelante debido a la introducción del sistema del Comodín en 1996.
+```{r}
+wildcard_era_teams<-read.csv("C:/Users/Ana/Desktop/Posibles proyectos/baseball.csv")[,-1]
+wildcard_era_teams$Playoff<-as.factor(wildcard_era_teams$Playoff)
+```
+
+# Modelo logit
+Primero se dividen los datos en un 80% para entrenar el modelo y el restante para probarlo
+```{r}
+set.seed(24)  # Para reproducibilidad
+trainIndex <- createDataPartition(wildcard_era_teams$Playoff, p = .8, list = FALSE, times = 1)
+trainData <- wildcard_era_teams[trainIndex, ]
+testData  <- wildcard_era_teams[-trainIndex, ]
+```
+
+Para determinar cuales son las variables más importantes, se utiliza la función StepAIC, el Criterio de información de Akaike o AIC por sus siglas en inglés, este " estima la calidad relativa de un modelo en función de la función de verosimilitud y el número de parámetro" https://www.linkedin.com/advice/1/what-advantages-disadvantages-using-aic-regression-model-iljic?lang=es&originalSubdomain=es#:~:text=1-,2%20%C2%BFC%C3%B3mo%20funciona%20AIC%3F,minimice%20la%20p%C3%A9rdida%20de%20informaci%C3%B3n, entre más bajo el coeficiente mejor.
+La función stepAIC(direction = "backward",trace = FALSE), lo que hace es ir probando todos los parámetros en el modelo irlos removiendo según su AIC, como es backward este empieza con todos y los va descartando
+```{r}
+glm_selection <- glm(Playoff ~  OPS+ERA+SF + SO + HA + RA + SV + BBA + DP + HRA + HR + AB + R + ER + X2B + H + SB + BB + HBP + SOA + E + SHO + OBP + Salary + SLG + X3B + CG + BA + CS, 
+               data = trainData, family = binomial)%>% 
+  stepAIC(direction = "backward",trace = FALSE)
+summary(glm_selection)
+```
+De lo anterior se determina 29 variables cargadas al modelo, únicamente el modelo con 15 variables es el que tiene menor AIC, sin embargo por cuestiones de interpretabilidad se decide elegir menos de 10 variables con el siguiente código:
+```{r}
+col<-c("OPS","ERA","SO","HA","RA","SV","HR","R","ER","X2B","OBP","Salary","X3B","CG","BA", "Playoff")
+df<-wildcard_era_teams[col]
+df<-rename(df, y=Playoff)
+
+best.logit <- bestglm(df,
+                      IC = "AIC",                 
+                      family=binomial,
+                      method = "exhaustive")
+best.logit$Subsets
+```
+```{r}
+best.logit$Subsets[9,]
+```
+Ahora sí, se calcula el modelo logit con las siguientes 8 variables: SO,HA,RA,SV,R,OBP,Salary,CG
+
+```{r}
+glmfit<- glm(Playoff ~ SO+HA+RA+SV+R+OBP+Salary+CG, 
+                        data = trainData, family = binomial)
+summary(glmfit)
+```
+para medir su precisión se hace la matriz de confusión:
+```{r}
+probabilities <- glmfit %>% predict(testData, type = "response")
+predicciones <- ifelse(probabilities> 0.5, "1", "0")
+predicciones <- factor(predicciones, levels = levels(testData$Playoff))
+
+
+matrix<-confusionMatrix(predicciones, testData$Playoff)
+
+matrix
+```
+Y la curva ROC
+```{r}
+logit_P = predict(glmfit  , newdata = testData[,-49] ,type = 'response')
+logit_P <- ifelse(logit_P > 0.5,1,0)
+roc_score<-roc(as.numeric(testData[,49]),logit_P)
+plot(roc_score ,main ="ROC curve -- Logistic Regression ")
+```
+
+
+
+
+
+
+El significado de cada una es el siguiente:
+ ##  https://www.mlb.com/glossary/standard-stats
+1.OPS On Base Plus Slugging: sumatoria de OBP y slugging
+2.ERA Earned Run Average: exito del pitcher en evitar carreras ganadas
+3.SO: Strikeouts
+5.HA: Bateos permitido por el pitcher
+6.RA run average rate at which runs are allowed or scored
+7.SV: saved games: ccurs every time a relief pitcher either records a save or a blown save
+8.HR: Home runs
+9.R: carreras
+10.ER earned run carreras sin el beneficio de un error o pase de bolta, sin mamadas defesivas
+11.X2B Doubles
+12.OBP: On-base Percentage how frequently a batter reaches base per plate appearance.
+13.Salary Salario
+14.X3B Triple
+15.CG Complete Game pitcher earns a complete game if he pitches the entire game for his team regardless of how long it lasts
+16.  BA Batting Average
+
+
+
+
+
+
+
+
