@@ -92,23 +92,7 @@ plot(roc_score ,main ="ROC curve -- Logistic Regression ")
 
 
 
-El significado de cada una es el siguiente:
- ##  https://www.mlb.com/glossary/standard-stats
-1.OPS On Base Plus Slugging: sumatoria de OBP y slugging
-2.ERA Earned Run Average: exito del pitcher en evitar carreras ganadas
-3.SO: Strikeouts
-5.HA: Bateos permitido por el pitcher
-6.RA run average rate at which runs are allowed or scored
-7.SV: saved games: ccurs every time a relief pitcher either records a save or a blown save
-8.HR: Home runs
-9.R: carreras
-10.ER earned run carreras sin el beneficio de un error o pase de bolta, sin mamadas defesivas
-11.X2B Doubles
-12.OBP: On-base Percentage how frequently a batter reaches base per plate appearance.
-13.Salary Salario
-14.X3B Triple
-15.CG Complete Game pitcher earns a complete game if he pitches the entire game for his team regardless of how long it lasts
-16.  BA Batting Average
+
 
 
 
